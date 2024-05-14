@@ -94,94 +94,38 @@ graph_128 = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit
 # graph_tct = CorpusGraph.from_dataset('msmarco_passage', 'corpusgraph_tcthnp_k16').to_limit_k(8)
 
 
-ne = 5
-
-selected_ks = [args.lk] #[2,4,8,16,32,64,128]
-
-for lk in selected_ks:
   
-    graph = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(lk)
+graph = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(args.lk)
 
-    scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=16)
-    pd.set_option('display.max_columns', None) 
-    pd.set_option('display.width', None)  # Display full width of the terminal
+scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=16)
+pd.set_option('display.max_columns', None) 
+pd.set_option('display.width', None)  # Display full width of the terminal
 
-    #graph = CorpusGraph.from_dataset('msmarco_passage', 'corpusgraph_bm25_k16').to_limit_k(16)
+from pyterrier.measures import *
+dataset = pt.get_dataset(f'irds:msmarco-passage/trec-dl-20{args.dl_type}/judged')
+pd.set_option('display.max_columns', None) 
+pd.set_option('display.width', None)  # Display full width of the terminal
 
-    # gar_pipeline = retriever >> GAR(scorer=scorer, corpus_graph=graph,batch_size=args.batch, num_results=args.budget) >> pt.text.get_text(dataset, 'text')
-    # gar_res = gar_pipeline.search('clustering hypothesis information retrieval')
-    # print(gar_res)
-    # print("*"*100)
-    # pipeline  = retriever >>  AFFM(scorer=scorer,corpus_graph=graph,graph_name=args.graph_name , dl_type=args.dl_type,
-    #                             dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
-    #                             num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,lk=args.lk, affm_name = args.affm_name,
-    #                             verbose=args.verbose) >> pt.text.get_text(dataset, 'text')
-    # res  =pipeline.search('clustering hypothesis information retrieval')
-    # print(res)
-    # exit()
-
-
-    # qid                                        query    docno  rank       score  iteration                                               text
-    #   1  clustering hypothesis information retrieval  2180710     0   -0.017059          0  Cluster analysis or clustering is the task of ...
-    #   1  clustering hypothesis information retrieval  8430269     1   -0.166563          1  Clustering is the grouping of a particular set...
-    #   1  clustering hypothesis information retrieval  1091429     2   -0.208345          1  Clustering is a fundamental data analysis meth...
-    #   1  clustering hypothesis information retrieval  2180711     3   -0.341018          5  Cluster analysis or clustering is the task of ...
-    #   1  clustering hypothesis information retrieval  6031959     4   -0.367014          5  Cluster analysis or clustering is the task of ...
-    #  ..                                          ...      ...   ...         ...        ...                                                ...
-    #                iteration column indicates which GAR batch the document was scored in ^
-    #                even=initial retrieval   odd=corpus graph    -1=backfilled
-
-
-    from pyterrier.measures import *
-    dataset = pt.get_dataset(f'irds:msmarco-passage/trec-dl-20{args.dl_type}/judged')
-    pd.set_option('display.max_columns', None) 
-    pd.set_option('display.width', None)  # Display full width of the terminal
-
-    if args.sgar:
-        exp = pt.Experiment(
-            [retriever >>  SGAR(scorer=scorer, corpus_graph=graph, num_results=args.budget, dataset=docstore,edge_mask_learner=model, tokenizer=tokenizer)],
-            dataset.get_topics(),
-            dataset.get_qrels(),
-            [nDCG,nDCG@10, MAP(rel=2), R(rel=2)@1000],
-            names=[f'bm25 >> SGAR(monot5) + c={args.budget} b={args.batch}']
-        )
-        print(exp.T)
-        print('*'*100)
-
-    elif args.baseline: 
-
-        exp = pt.Experiment(
-        [retriever, retriever % args.budget >> scorer ],
-        dataset.get_topics(),
-        dataset.get_qrels(),
-        [nDCG, nDCG@10, MAP(rel=2), R(rel=2)@1000],
-        names=['bm25', f'bm25 >> monot5 c={args.budget}' ]
-        )
-        print('*'*100)
-        print(exp.T)
-    
-    else:    
-
-        exp = pt.Experiment(
-            [retriever % args.budget >> scorer,
-             retriever  >> GAR(scorer=scorer, corpus_graph=graph,batch_size=args.batch, num_results=args.budget),
-             #retriever >>  AFFM(scorer=scorer,corpus_graph=graph_128, num_results=args.budget, batch_size=args.batch, use_corpus_graph=True), 
-             retriever >>  AFFM(scorer=scorer,corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
-                                retriever = args.retriever,
-                                dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
-                                num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,lk=args.lk, affm_name = args.affm_name,
-                                verbose=args.verbose)
-             ],
-            dataset.get_topics(),
-            dataset.get_qrels(),
-            [nDCG, nDCG@args.budget,nDCG@10, MAP(rel=2), R(rel=2)@args.budget],
-            names=[f"bm25 >> monot5 c={args.budget}", 
-                   f"bm25>>monot5 GAR+c={args.budget} b={args.batch}",
-                    #f"bm25>>monot5 AFFM+CG c={args.budget} b={args.batch}",
-                   f'bm25>>monot5 {args.affm_name} lk={args.lk} c={args.budget} b={args.batch}'
-                   ]
-                #    save_dir = f"results/dl{args.dl_type}/{args.graph_name}/ablation/",
-                #    save_mode="overwrite"
-        )
-        print(exp.T)
-        print('*'*100)
+exp = pt.Experiment(
+    [retriever % args.budget >> scorer,
+        retriever  >> GAR(scorer=scorer, corpus_graph=graph,batch_size=args.batch, num_results=args.budget),
+        #retriever >>  AFFM(scorer=scorer,corpus_graph=graph_128, num_results=args.budget, batch_size=args.batch, use_corpus_graph=True), 
+        retriever >>  AFFM(scorer=scorer,corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
+                        retriever = args.retriever,
+                        dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
+                        num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,lk=args.lk, affm_name = args.affm_name,
+                        verbose=args.verbose)
+        ],
+    dataset.get_topics(),
+    dataset.get_qrels(),
+    [nDCG, nDCG@args.budget,nDCG@10, MAP(rel=2), R(rel=2)@args.budget],
+    names=[f"bm25 >> monot5 c={args.budget}", 
+            f"bm25>>monot5 GAR+c={args.budget} b={args.batch}",
+            #f"bm25>>monot5 AFFM+CG c={args.budget} b={args.batch}",
+            f'bm25>>monot5 {args.affm_name} lk={args.lk} c={args.budget} b={args.batch}'
+            ]
+        #    save_dir = f"results/dl{args.dl_type}/{args.graph_name}/ablation/",
+        #    save_mode="overwrite"
+)
+print(exp.T)
+print('*'*100)
