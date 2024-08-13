@@ -1,3 +1,5 @@
+"""can be directly used from pyterrier_adaptive.corpus_graph as well"""
+
 import pickle
 import tempfile
 from lz4.frame import LZ4FrameFile

@@ -39,20 +39,8 @@ dataset = ir_datasets.load("msmarco-passage/train")
 doc_store = dataset.docs_store()
 
 
-save_data = False   
-train_data_type = "tct"
-## code for converting the dataset to a list of tuples
-
-if save_data:
-    data_list = []
-
-    ds_path = f"data/ms_marcopassage_train_50k_pseudo_pos_neg_nbh_Q_S_ds_{train_data_type}>>monoT5"
-    run_ds = datasets.load_from_disk(ds_path)
-
-# print(run_ds)
-# print(run_ds[0])
-
-
+run_ds = datasets.load_from_disk("data/laff_train_data")
+data_list = []
 
 def add_training_data(row):
     qid = row['qid']
@@ -61,91 +49,29 @@ def add_training_data(row):
     neg = row['neg']
     s = row["S"]
     score = row['score']
-    Q = row['Q']
 
     if len(s)!=0:
         for p in pos:
             for n in neg:
-                data_list.append((p, n, s, score, Q))    
+                data_list.append((p, n, s, score))     ## We create a tuple of positive, negative, S, and score
 
 
-def add_training_data_S(row):
-    pos = row['pseudo_pos']
-    neg = row['neg']
-    score = row['score']
-    s = pos
-
-    if len(pos)!=0:
-        for p in pos:
-            for n in neg:
-                data_list.append((p, n, s, score))       
+run_ds.map(add_training_data, desc="adding data points to data list")
 
 
-def add_training_data_S_ind(row):
-    qid = row['qid']
-    query = row['query']
-    pos = row['pseudo_pos']
-    neg = row['neg']
+"""In the following code snippet, we define a custom collate function that encodes the batch of data points. 
+The function takes a batch of data points and encodes them using the tokenizer. The function returns a dictionary containing the input IDs, attention mask, token type IDs, S, and score for each data point in the batch. 
+"""
 
-    if len(pos)!=0:
-        data_list.append((pos, neg))
-
-
-def add_all_data(row):
-    qid = row['qid']
-    query = row['query']
-    pos = row['pseudo_pos']
-    neg = row['neg']
-    s = row["S"]
-    score = row['score']
-    Q = row['Q']
-
-    data_list.append((pos, neg, s, score, Q))
-
-
-
-if save_data:
-    run_ds.map(add_all_data, desc="adding data points to data list")
-
-    with open(f'data/ms_marcopassage_train_50k_pseudo_pos_neg_nbh_Q_S_ds_all_{train_data_type}>>monoT5.pkl', 'wb') as f:
-        pickle.dump(data_list, f)
-
-
-
-with open(f'data/ms_marcopassage_train_50k_pseudo_pos_neg_nbh_Q_S_ds_all_{train_data_type}>>monoT5.pkl', 'rb') as f:
-    data_list = pickle.load(f)
-
-
-# print(data_list[0])
-
-# print(len(data_list))
-
-# exit()
-
-train_data = data_list
-
-
-
-base_model_name =  "bert-base-uncased" #"bert_small"
-
-if base_model_name!="bert-base-uncased":
-    tokenizer = BertTokenizer.from_pretrained("prajjwal1/bert-small", torch_dtype=torch.float16)
-    base_model = BertForSequenceClassification.from_pretrained("prajjwal1/bert-small", num_labels=1,torch_dtype=torch.float16)
-else:
-    tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.float16)
-    base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=1,torch_dtype=torch.float16)
-
-
-#path = f"models/bert-base-uncased_ms_marcopassage_train_random_neg.pth"
-path = f"models/bert-base-uncased_ms_marcopassage_train_50k_pseudo_pos_neg_S_ds_tct>>monoT5_epoch=5_loss=unbce.pth"
-
+base_model_name =  "bert-base-uncased" 
+tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.float16)
+base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=1,torch_dtype=torch.float16)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 model = BinaryClassificationBertModel(base_model)
-# model.load_state_dict(torch.load(path, map_location=device))
 model.to(device)
 
 
+"""A custom dataset class is defined to load the data points from the data list."""
 class MSMARCODatasetS(Dataset):
     def __init__(self, data, doc_store):
         self.data = data
@@ -172,7 +98,10 @@ class MSMARCODatasetS(Dataset):
             "score": score
         }
 
-def encode_batchS(batch, tokenizer, max_length):
+
+"""The function is used as the collate function for the DataLoader."""
+
+def encode_batch(batch, tokenizer, max_length):
     texts = []
     s_texts = []
     s_list = []
@@ -212,101 +141,23 @@ def encode_batchS(batch, tokenizer, max_length):
     }
 
 
-def encode_batch_bce(batch, tokenizer, max_length):
-    texts = []
-    s_texts = []
-    s_list = []
-    scores = []
-    labels= []
-
-
-    # Collect texts and scores
-    for item in batch:
-        assert len(item['s_text']) == len(item['pos_text']) == len(item['neg_text']), f"Lengths of s and score are not the same."
-
-        for i in range(len(item['pos_text'])):
-            pos_texts = [item['pos_text'][i]] * len(item['s_text'])
-            neg_texts = [item['neg_text'][i]] * len(item['s_text'])
-            texts.extend(pos_texts + neg_texts)    
-            pos_label = [1]*len(pos_texts)
-            neg_label = [0]*len(neg_texts)
-            labels.extend(pos_label+neg_label)        
-            s_texts.extend(item['s_text']*2)
-            s_list.extend([item['s']] * 2)  # Assuming 's' is the same for all s_texts in an item
-            scores.extend([item['score']] * 2) # Assuming 'score' is the same for all s_texts in an item
-
-
-    # Encode all texts in one call
-    encodings = tokenizer.batch_encode_plus(
-        list(zip(texts, s_texts)),
-        max_length=max_length,
-        padding=True,
-        truncation=True,
-        return_attention_mask=True,
-        return_tensors='pt'
-    )
-
-    return {
-        'input_ids': encodings['input_ids'],
-        'attention_mask': encodings['attention_mask'],
-        'token_type_ids': encodings['token_type_ids'],  # Assuming you still want token_type_ids
-        's': s_list,
-        'score': scores,
-        'label':labels
-    }
-
-
 
 train_por = 0.95
-#int(len(data_list)*train_por)
-batch_size= 2 #128 #8
+batch_size= 16
 
 
-
-# train_dataset = MSMARCODatasetS(data_list[:1000], doc_store)
-# val_dataset = MSMARCODatasetS(data_list[-40:], doc_store)
 
 train_dataset = MSMARCODatasetS(data_list[:int(train_por*len(data_list))],doc_store)
 val_dataset = MSMARCODatasetS(data_list[int(train_por*len(data_list)):], doc_store)
 
-custom_collate_fn = functools.partial(encode_batch_bce, tokenizer=tokenizer, max_length=512)
+custom_collate_fn = functools.partial(encode_batch, tokenizer=tokenizer, max_length=512)
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,collate_fn=custom_collate_fn)
 val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False,collate_fn=custom_collate_fn )
 
 
-optimizer = AdamW(model.parameters(), lr=0.0000003)  # Default learning rate is 0.0000003
+optimizer = AdamW(model.parameters(), lr=0.0000003)  
 
 bceloss = torch.nn.BCEWithLogitsLoss(reduction='mean')
-bce = torch.nn.BCELoss()
-
-#marginloss = torch.nn.MarginRankingLoss(margin=1.0)
-
-
-def loss_fun(logits, score, margin=1.0):
-
-    score = torch.tensor(score, device=device)
-    score = F.softmax(score, dim=-1)
-
-    logits = logits.reshape(score.size())
-    aff_scores = torch.mul(score, logits).sum(dim=-1).reshape(-1,2) #ToDo add a scaling factor
-
-    loss =  torch.clamp(margin - (torch.sigmoid(aff_scores[:,0].view(-1)) - torch.sigmoid(aff_scores[:,1].view(-1))), min=0).mean()
-
-    return loss
-
-margin=1.0
-
-def margin_loss(pos_scores, neg_scores):
-    return torch.clamp(margin - (torch.sigmoid(pos_scores.view(-1)) - torch.sigmoid(neg_scores.view(-1))), min=0).mean()
-
-
-def bceloss_shuffle(pred,labels):
-    num_samples = pred.size(0)
-    perm_indices = torch.randperm(num_samples)
-    shuffled_pred = pred[perm_indices]
-    shuffled_true_labels = labels[perm_indices]
-
-    return bceloss(pred, labels)
 
 
 def log_gradients(model):
@@ -330,9 +181,9 @@ scheduler = get_scheduler(
     num_training_steps=total_training_steps
 )
 
-use_loss = "bce"
 
-print(f"loss={use_loss}, base_model={base_model_name}, S=top rank" )
+print(f"base_model={base_model_name}, S=top rank" )
+
 
 if __name__ == "__main__":
     for epoch in range(num_epochs):
@@ -349,16 +200,8 @@ if __name__ == "__main__":
             outputs = model(input_ids=input_ids,attention_mask=attention_mask, token_type_ids=token_type_ids)
             label = torch.tensor(batch['label'], dtype=outputs.logits.dtype, device=device).unsqueeze(dim=-1)
 
+            loss =  bceloss(outputs.logits, label)
 
-            # print("outputs", outputs.logits, outputs.logits.size())
-            # print("label", label, label.size())
-            # exit()
-
-            if use_loss=="bce":
-                loss =  bceloss_shuffle(outputs.logits, label)
-
-            elif use_loss=="margin":
-                loss = loss_fun(outputs.logits, score, 1.0)
 
             if torch.isnan(loss):
                 print("NaN loss detected")
@@ -402,8 +245,4 @@ if __name__ == "__main__":
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch+1}, Average Loss: {avg_loss:.4f}")
 
-        # if base_model_name=="bert-base-uncased":
-        #     torch.save(model.state_dict(), f"models/{base_model_name}_ms_marcopassage_train_50k_curriculum_pseudo_rank_pos_neg_nbh_Q_S_ds_{train_data_type}>>monoT5_epoch={epoch+1}_loss={use_loss}.pth")
-    
-    #if base_model_name!="bert-base-uncased":
-    torch.save(model.state_dict(), f"models/{base_model_name}_ms_marcopassage_train_50k_laff_curriculum_pseudo_pos=S_neg_ds_{train_data_type}>>monoT5_loss={use_loss}.pth")    
+    torch.save(model.state_dict(), f"models/laff_model.pth")    

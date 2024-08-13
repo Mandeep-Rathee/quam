@@ -50,11 +50,13 @@ class BinaryClassificationBertModel(nn.Module):
             token_type_ids (torch.Tensor): The token type IDs.
 
         Returns:
-            outputs (tuple): A tuple containing the model outputs.
+            outputs: model outputs.
 
         """
         outputs = self.base_model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids)
         return outputs
+
+
 
     def dual_encoder(self, batch, device):
         """

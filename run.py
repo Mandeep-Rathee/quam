@@ -33,12 +33,9 @@ parser.add_argument("--batch", type=int, default=16, help="batch size")
 parser.add_argument("--budget", type=int, default=100, help="budget c")
 parser.add_argument("--top_res", type=int, default=30, help="top intial docs as a seed to the affinity model")
 parser.add_argument("--verbose", action="store_true", help="if show progress bar.")
-parser.add_argument("--affm_name", type=str,default= "EAffM",help="which Affinity based model to use, ERelM or EAffM ?")
 parser.add_argument("--retriever", type=str, default="bm25", help="name of the retriever")
 parser.add_argument("--ret_scorer", type=str, default="bm25", help="name of the retriever as a scorer")
 parser.add_argument("--use_corpus_graph", action="store_true", help="if use G_c")
-# parser.add_argument("--alpha", type=float, default=0.5, help="the interpolation parameter")
-# parser.add_argument("--use_int", action="store_true", help="if use Interpolation b/w sparse and dense graphs")
 
 
 
@@ -55,22 +52,19 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 base_model_name = "bert-base-uncased" 
-
-# if base_model_name!="bert-base-uncased":
-#     tokenizer = BertTokenizer.from_pretrained("prajjwal1/bert-small", torch_dtype=torch.float16)
-#     base_model = BertForSequenceClassification.from_pretrained("prajjwal1/bert-small", num_labels=1,torch_dtype=torch.float16)
-# else:
 tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.float16)
 base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=1,torch_dtype=torch.float16)
 
-#models/{base_model_name}_ms_marcopassage_train_50k_pseudo_pos_neg_S_ds_tct>>monoT5_epoch=5_loss={args.loss}.pth
+
+"""Define the model and load the pre-trained weights"""
 
 model = BinaryClassificationBertModel(base_model)
 model.load_state_dict(torch.load(f"laff_models/bert-base-laff.pth"))
 model.to(device)
-dataset_store = ir_datasets.load('msmarco-passage')
-docstore = dataset_store.docs_store()
+dataset_store = ir_datasets.load('mmodels/laff_model.pth')
 
+
+docstore = dataset_store.docs_store()
 
 
 if args.retriever=="bm25":
@@ -81,18 +75,6 @@ else:
         NumpyIndex('indices/castorini__tct_colbert-v2-hnp-msmarco.np', verbose=False))
 
 dataset = pt.get_dataset('irds:msmarco-passage')
-
-#ret_scorer = pt.text.get_text(dataset, 'text') >> retriever
-
-
-
-if args.ret_scorer=="bm25":
-    existing_index = pt.IndexFactory.of("indices/bm25_msmarco_passage")
-    ret_scorer = pt.batchretrieve.TextScorer(takes="docs", body_attr="text", wmodel="BM25",background_index= existing_index, controls={"termpipelines": "Stopwords,PorterStemmer"})
-
-else:
-    ret_scorer = BiScorer(bi_encoder_model=TctColBert(device="cuda"),batch_size=1024)
-
 
 scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=args.batch)
 pipeline = retriever >> scorer
@@ -126,7 +108,6 @@ exp = pt.Experiment(
                            lk=args.lk, batch_size=args.batch),
 
         retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
-                        retriever_name = args.retriever, retriever = ret_scorer,
                         dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
                         num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,
                         use_corpus_graph=True, use_int = args.use_int,
@@ -137,13 +118,13 @@ exp = pt.Experiment(
                         retriever_name = args.retriever, 
                          dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model,
                           batch_size=args.batch, num_results=args.budget,
-                          retriever = ret_scorer, use_int = args.use_int, laff_scores=True,saved_scores=True,
+                          use_int = args.use_int, laff_scores=True,saved_scores=True,
                           lk=args.lk
                           ),
 
                         
         retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
-                        retriever_name = args.retriever, retriever = ret_scorer,
+                        retriever_name = args.retriever,
                         dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
                         num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,
                         use_corpus_graph=False, use_int = args.use_int,
@@ -166,6 +147,3 @@ exp = pt.Experiment(
 )
 print(exp.T)
 print('*'*100)
-
-print()
-print()

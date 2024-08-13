@@ -16,11 +16,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 warnings.filterwarnings("ignore", message="Be aware, overflowing tokens are not returned for the setting you have chosen, i.e. sequence pairs with the 'longest_first' truncation strategy.*")
 warnings.filterwarnings("ignore",message="WARN org.terrier.querying.ApplyTermPipeline - The index has no termpipelines configuration, and no control configuration is found. Defaulting to global termpipelines configuration of 'Stopwords,PorterStemmer'. Set a termpipelines control to remove this warning.")
 
-use_ret_scores = False
-use_rel_scores = True
 
 class QUAM(pt.Transformer):
-    """
+    """This class is based on pyterrier_adaptive (graph based adaptive re-ranking) https://github.com/terrierteam/pyterrier_adaptive
     Required input columns: ['qid', 'query', 'docno', 'score', 'rank']
     Output columns: ['qid', 'query', 'docno', 'score', 'rank', 'iteration']
     where iteration defines the batch number which identified the document. Specifically
@@ -30,10 +28,6 @@ class QUAM(pt.Transformer):
     def __init__(self,
         scorer: pt.Transformer,
         corpus_graph: "CorpusGraph",
-        graph_name: str = "gbm25",
-        dl_type: int= 19,
-        retriever_name: str="bm25",
-        retriever = None,
         dataset = None ,
         tokenizer = None,
         edge_mask_learner=None,
@@ -43,10 +37,7 @@ class QUAM(pt.Transformer):
         backfill: bool = True,
         enabled: bool = True,
         use_corpus_graph: bool = False,
-        use_int:bool = False,
         lk: int = 16,
-        saved_scores:bool = False,
-        alpha: float=0.5,
         affm_name: str = None,
         verbose: bool = True):
         """
@@ -62,10 +53,6 @@ class QUAM(pt.Transformer):
         """
         self.scorer = scorer
         self.corpus_graph = corpus_graph
-        self.graph_name = graph_name
-        self.dl_type = dl_type
-        self.retriever_name = retriever_name
-        self.retriever = retriever
         self.dataset = dataset
         self.tokenizer = tokenizer
         self.edge_mask_learner = edge_mask_learner
@@ -77,10 +64,7 @@ class QUAM(pt.Transformer):
         self.backfill = backfill
         self.enabled = enabled
         self.use_corpus_graph = use_corpus_graph
-        self.use_int = use_int
         self.lk = lk
-        self.saved_scores = saved_scores
-        self.alpha = alpha
         self.affm_name = affm_name
         self.verbose = verbose
 
@@ -92,17 +76,6 @@ class QUAM(pt.Transformer):
         
         result = {'qid': [], 'query': [], 'docno': [], 'rank': [], 'score': [], 'iteration': []}
 
-        dict_path = f"scored_docs/ms-marco-passage-{self.graph_name}/dl{self.dl_type}/{self.retriever_name}>>MonoT5-base-128/laff_scores.json" 
-        pruned_graph_path = f"aff-scored/msmarco-passage-{self.graph_name}/dl{self.dl_type}/laff_{self.retriever_name}>>MonoT5-base-128"
-
-
-        scores_dict = {}
-        if self.saved_scores:
-            with open(dict_path, 'r') as f:
-                scores_dict = json.load(f)
-            aff_ds = datasets.load_from_disk(pruned_graph_path)
-
-
         df = dict(iter(df.groupby(by=['qid'])))
         qids = df.keys()
         if self.verbose:
@@ -110,21 +83,10 @@ class QUAM(pt.Transformer):
 
         for qid in qids:
 
-            if not self.saved_scores:
-                docid_index = {}
-                q_aff_ds = None
-            else:
-                docid_index = {}
-                q_aff_ds = aff_ds.filter(lambda example: example["qid"]==qid )
-                for i, row in enumerate(q_aff_ds):
-                    docid_index[row['docno']] = i
-
-            
             scores = {}
             res_map = [Counter(dict(zip(df[qid].docno, df[qid].score)))] # initial results {docno: rel score}
             if self.enabled:
                 res_map.append(Counter())
-            iteration = 0
 
             r1_upto_now = {}
             iteration=0  
@@ -139,7 +101,6 @@ class QUAM(pt.Transformer):
                 size = min(self.batch_size, self.num_results - len(scores)) # get either the batch size or remaining budget (whichever is smaller)
 
                 # build batch of documents to score in this round
-                
                 batch = this_res.most_common(size)
 
                 batch = pd.DataFrame(batch, columns=['docno', 'score'])
@@ -162,7 +123,7 @@ class QUAM(pt.Transformer):
                     new_docs = recent_docs.intersection(S)  ### Find newly re-ranked documents in S    
                     
                     if new_docs is not None:
-                        self._update_frontier_corpus_graph(new_docs, res_map[1],scores, q_aff_ds, docid_index, S, scores_dict)
+                        self._update_frontier_corpus_graph(new_docs, res_map[1],scores, S)
 
                 iteration+=1   
 
@@ -191,12 +152,6 @@ class QUAM(pt.Transformer):
     
 
 
-        """ Save the updated dictionary to a JSON file """
-
-        if self.saved_scores:
-            with open(dict_path, 'w') as f:
-                json.dump(scores_dict, f)
-
         return pd.DataFrame({
             'qid': np.concatenate(result['qid']),
             'query': np.concatenate(result['query']),
@@ -216,8 +171,8 @@ class QUAM(pt.Transformer):
             for c in counters:
                 del c[docno]
 
-    """ this function will update the frontier i.e., res_map[1] based on the edges in the Coprus Graph G_c or Affinity Graph G_a. We will use dense graph, with depth 128.
-        Affinity scores for retrived documents are calculated and saved already. For 2 or more hop neighbours we need to calculate them on fly. 
+    """ this function will update the frontier i.e., res_map[1] based on the edges in the Coprus Graph G_c or Affinity Graph G_a. We use the graph with depth 128.
+        We will release the full laff based graph soon, meanwhile we need to calculate them on fly. 
     """
     
     def _update_frontier_corpus_graph(self, scored_batch, frontier, scored_dids, q_aff_ds, docid_index, S, stored_dict):
@@ -225,8 +180,7 @@ class QUAM(pt.Transformer):
             Scored_batch: the documents from prevoius Iteration's batch which are in top_res (topk documents from R1)
             frontier: res_map[1] = {"docid" :xpected_aff_score} Either we add the doc to frontier or update the score. 
             q_aff_ds: the part of saved aff scores dataset for query q.
-            docid_index: Python dictionary for quick lookUp for doc_id in q_aff_ds
-            S: Set $S$ with scores from scorer for documents in top_res.  
+            S: Set $S$ with scores from scorer for top k documents from R1.  
         """
 
         """ if we want to use Set Affinity, normalize the relevance scores/ node weights."""
@@ -243,30 +197,16 @@ class QUAM(pt.Transformer):
                      aff_scores =  [(x - min(aff_scores)) / (max(aff_scores) - min(aff_scores)) for x in aff_scores]
                 neighbors = neighbors.tolist()
 
-            else:
-                """First we try to look in afinity ds or stored dict. 
-                Otherwise we generate affinity scores on fly and update the stored dict.
-                """
-                if doc_id in docid_index:   # Use G_a (Affinity Graph) for edge weights (affinity scores)
-                    selected_row = q_aff_ds[docid_index[doc_id]]
-                    neighbors = selected_row['neighbours']
-                    aff_scores = selected_row['affinity_scores']
-                elif doc_id in stored_dict:
-                    neighbors = stored_dict[doc_id]["neighbours"]
-                    aff_scores = stored_dict[doc_id]["affinity_scores"]
-                else:
-                    neighbors = self.corpus_graph.neighbours(doc_id).tolist()
-                    aff_scores = self.get_scores_on_fly(doc_id, neighbors)  ### Should come from either saved or compute the scores. 
-                    stored_dict[doc_id] = {"neighbours": neighbors, "affinity_scores":aff_scores}  
+            else:                           # Use G_a (Affinity Graph) for edge weights (affinity scores)
+                neighbors = self.corpus_graph.neighbours(doc_id).tolist()
+                aff_scores = self.get_scores_on_fly(doc_id, neighbors)  ### Should come from either saved or compute the scores. 
 
+                """ If affinity scores are not sorted, sort them and take top k neighbours. """  
 
-            """ If affinity scores are not sorted, sort them and take top k neighbours. """  
-
-            combined_docs_affscores = list(zip(neighbors,aff_scores))
-            combined_sorted = sorted(combined_docs_affscores, key=lambda x:x[1], reverse=True)
-            top_lk_docs_scores = combined_sorted[:self.lk]
-            neighbors, aff_scores = zip(*top_lk_docs_scores)
-
+                combined_docs_affscores = list(zip(neighbors,aff_scores))
+                combined_sorted = sorted(combined_docs_affscores, key=lambda x:x[1], reverse=True)
+                top_lk_docs_scores = combined_sorted[:self.lk]
+                neighbors, aff_scores = zip(*top_lk_docs_scores)
 
             """for each neighbour, calculate or update the set affinity score and update the frontier."""
 
