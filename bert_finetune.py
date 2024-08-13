@@ -41,6 +41,8 @@ with open('data/ms_marcopassage_train_random_neg.pkl', 'rb') as f:
     data_list = pickle.load(f)
 
 
+
+
 #graph = CorpusGraph.from_dataset('msmarco_passage', 'corpusgraph_bm25_k16').to_limit_k(16)
 #graph = CorpusGraph.load("msmarco-passage.gtcthnp.1024").to_limit_k(10)
 
@@ -85,6 +87,7 @@ class MSMARCODataset(Dataset):
         return  {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
+            'token_type_ids': encoding['token_type_ids'].flatten(),
             'label':label
         }
 
@@ -128,10 +131,11 @@ for epoch in range(num_epochs):
     for batch in tqdm(train_loader):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
+        token_type_ids = batch['token_type_ids'].to(device)
         labels = batch['label'].float().unsqueeze(dim=-1).to(device)
 
         optimizer.zero_grad()
-        outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+        outputs = model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids = token_type_ids)
         logits = outputs.logits
 
         # print("logits", logits, logits.shape)
@@ -158,9 +162,10 @@ for epoch in range(num_epochs):
     for batch in tqdm(val_loader):
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
+        token_type_ids = batch['token_type_ids'].to(device)
 
         with torch.no_grad():
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask,token_type_ids = token_type_ids)
 
             logits = outputs.logits
             prob = torch.nn.Sigmoid()(logits)
@@ -176,4 +181,4 @@ for epoch in range(num_epochs):
     print(f'Epoch {epoch + 1}/{num_epochs}, Validation Accuracy: {val_accuracy}')
 
 
-torch.save(model.state_dict(), f"models/{base_model_name}_ms_marcopassage_train_random_neg.pth")
+#torch.save(model.state_dict(), f"models/{base_model_name}_ms_marcopassage_train_random_neg.pth")

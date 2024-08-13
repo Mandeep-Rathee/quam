@@ -5,7 +5,7 @@ import torch.multiprocessing as mp
 import ir_datasets
 from datasets import Dataset, load_dataset
 from torch.utils.data import DataLoader 
-
+import json
 
 import datasets
 
@@ -88,22 +88,28 @@ print(ds[0])
 
 
 
+
 ### Loading the graph, we start with k =128 and save the similarity scores at onnce. We can re-use them for different k and thresholds
 
 
-graph_path = f"msmarco-passage.{args.graph_name}.1024"
+#graph_path = f"msmarco-passage.{args.graph_name}.1024"
+
+graph_path = "corpusgraph_k128"
 docnos = Lookup(f"{graph_path}/docnos.npids")
+graph_info = json.load(open(f"{graph_path}/pt_meta.json"))
 
 print("docnos loaded")
 
+
 def edges_data(lk):
-    res = np.memmap(f"{graph_path}/{args.edge_path}", mode='r', dtype=np.uint32).reshape(-1, 1024)
+    res = np.memmap(f"{graph_path}/{args.edge_path}", mode='r', dtype=np.uint32).reshape(-1, graph_info.get('k')) 
     res = res[:, :lk]
     return res
 
 edges_data_store = edges_data(args.lk)
 
 print("edges data loaded")
+
 
 def neighbours(docid):
     as_str = isinstance(docid, str)
@@ -128,7 +134,8 @@ def add_neighbours(row):
 
     return {"neighbours": neigh}    
 
-ds  = ds.map(add_neighbours, desc="adding neighborhood pairs in the dataset",num_proc=16) #,batched=True, batch_size=16 ) # num_proc=16)
+
+ds  = ds.map(add_neighbours, desc="adding neighborhood pairs in the dataset",num_proc=16) 
 
 print(ds)
 
@@ -142,7 +149,7 @@ base_model_name = "bert-base-uncased"
 tokenizer = BertTokenizer.from_pretrained(args.base_model_name)
 base_model = BertForSequenceClassification.from_pretrained(args.base_model_name, num_labels=1, torch_dtype=torch.float16)
 model = BinaryClassificationBertModel(base_model)
-model.load_state_dict(torch.load(f"models/{args.base_model_name}_ms_marcopassage_train_random_neg.pth"))
+model.load_state_dict(torch.load(f"models/{args.base_model_name}_ms_marcopassage_train_50k_pseudo_pos_neg_S_ds_tct>>monoT5_epoch=5_loss=unbce.pth"))
 model.to(device)
 
 
@@ -164,15 +171,16 @@ def doc_pair_scores(row ):
         data_list.append((row['docno'], n, 1))
 
     batch_dataset = MSMARCODataset(data_list, docstore,  tokenizer, max_length=512)
-    loader = DataLoader(batch_dataset, batch_size=128)
+    loader = DataLoader(batch_dataset, batch_size=128,shuffle=False)
 
 
     for batch in loader:
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
+        token_type_ids=batch['token_type_ids'].to(device) 
 
         with torch.no_grad():
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask,token_type_ids=token_type_ids)
             logits = outputs.logits
 
         # Convert logits to probabilities
@@ -185,8 +193,15 @@ def doc_pair_scores(row ):
 
 
 
+
+base_path = f"aff-scored/msmarco-passage-{args.graph_name}/dl{args.dl_type}/"
+if not os.path.exists(base_path):
+   print("path not found")
+   os.mkdir(base_path)
+   
+
 ds  = ds.map(doc_pair_scores, desc="calculating the sim scores")
 print(ds)
 print(ds[0])
-ds_path = f"aff-scored/msmarco-passage-{args.graph_name}/dl{args.dl_type}/{args.retriever}>>MonoT5-base-{args.lk}"
+ds_path = f"aff-scored/msmarco-passage-{args.graph_name}/dl{args.dl_type}/laff_{args.retriever}>>MonoT5-base-{args.lk}"
 ds.save_to_disk(ds_path)

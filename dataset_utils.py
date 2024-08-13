@@ -4,11 +4,11 @@ from torch.utils.data import DataLoader, Dataset
 
 
 class MSMARCODataset(Dataset):
-    def __init__(self, data, doc_store, tokenizer,max_length):
+    def __init__(self, data, doc_store, tokenizer):
         self.data = data
         self.doc_store = doc_store
         self.tokenizer= tokenizer
-        self.max_length = max_length
+        self.max_length = 512
 
     def __len__(self):
         return len(self.data)
@@ -34,5 +34,7 @@ class MSMARCODataset(Dataset):
         return  {
             'input_ids': encoding['input_ids'].flatten(),
             'attention_mask': encoding['attention_mask'].flatten(),
+            'token_type_ids': encoding['token_type_ids'].flatten(),
             'label':label
         }
+    
