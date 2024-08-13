@@ -47,9 +47,7 @@ np.random.seed(args.seed)
 transformers.logging.set_verbosity_error()
 
 
-
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
 
 base_model_name = "bert-base-uncased" 
 tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.float16)
@@ -80,7 +78,6 @@ scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batc
 pipeline = retriever >> scorer
 
 
-
 if args.graph_name=="gtcthnp":
     graph_128 = CorpusGraph.load("corpusgraph_k128").to_limit_k(128)
     graph = CorpusGraph.load("corpusgraph_k128").to_limit_k(args.lk)
@@ -107,29 +104,23 @@ exp = pt.Experiment(
                           num_results=args.budget, laff_scores=False,
                            lk=args.lk, batch_size=args.batch),
 
-        retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
+        retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,
                         dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
                         num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,
-                        use_corpus_graph=True, use_int = args.use_int,
-                        lk=args.lk, affm_name = args.affm_name,
-                        verbose=args.verbose),
+                        use_corpus_graph=True, lk=args.lk, verbose=args.verbose),
+
 
         retriever  >> GAR(scorer=scorer, corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
                         retriever_name = args.retriever, 
                          dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model,
-                          batch_size=args.batch, num_results=args.budget,
-                          use_int = args.use_int, laff_scores=True,saved_scores=True,
+                          batch_size=args.batch, num_results=args.budget, laff_scores=True,saved_scores=True,
                           lk=args.lk
                           ),
 
-                        
-        retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
-                        retriever_name = args.retriever,
+        retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,
                         dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
                         num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,
-                        use_corpus_graph=False, use_int = args.use_int,
-                        lk=args.lk,  saved_scores= True, affm_name = args.affm_name,
-                        verbose=args.verbose),
+                        use_corpus_graph=False, lk=args.lk, verbose=args.verbose),
 
         ],
     dataset.get_topics(),
@@ -141,9 +132,7 @@ exp = pt.Experiment(
             f"GAR_Laff.c{args.budget}",
             f"QuAM_Laff.c{args.budget}"
             ],
-    #baseline=0,
-    #correction='bonferroni',   
-    #save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     
+    save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     
 )
 print(exp.T)
 print('*'*100)
