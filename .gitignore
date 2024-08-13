@@ -41,3 +41,4 @@ saved_pyterrier_runs/
 train_laff_Q.py
 train_laff_wo_S.py
 tct_retriever.py
+laff_model/
