@@ -92,7 +92,7 @@ class QUAM(pt.Transformer):
         
         result = {'qid': [], 'query': [], 'docno': [], 'rank': [], 'score': [], 'iteration': []}
 
-        dict_path = f"scored_docs/ms-marco-passage-{self.graph_name}/dl{self.dl_type}/{self.retriever_name}>>MonoT5-base-128/laff_scores.json" ##pruned_graph_affinity
+        dict_path = f"scored_docs/ms-marco-passage-{self.graph_name}/dl{self.dl_type}/{self.retriever_name}>>MonoT5-base-128/laff_scores.json" 
         pruned_graph_path = f"aff-scored/msmarco-passage-{self.graph_name}/dl{self.dl_type}/laff_{self.retriever_name}>>MonoT5-base-128"
 
 
@@ -145,26 +145,10 @@ class QUAM(pt.Transformer):
                 batch = pd.DataFrame(batch, columns=['docno', 'score'])
                 batch['qid'] = qid
                 batch['query'] = query
-
-
-                # if use_ret_scores:
-                #     batch_ = batch.copy()
-                #     doc_text = []
-                #     for doc in batch_.docno:
-                #         doc_text.append(self.dataset.get(doc).text)
-                #     batch_['text'] = doc_text    
-                #     ret_scores_batch = self.retriever(batch_)
-                #     r1_upto_now.update({k: s for k, s  in zip(ret_scores_batch.docno, ret_scores_batch.score)})
                     
 
                 # go score the batch of document with the re-ranker
                 batch = self.scorer(batch)
-
-                # if use_rel_scores:      
-                #     r1_upto_now.update({k: s for k, s  in zip(batch.docno, batch.score)})
-                # top_k_r1 = dict(Counter(r1_upto_now).most_common(self.top_int_res))
-                # recent_docs = set(batch.docno)
-                # new_docs = recent_docs.intersection(top_k_r1)
 
                 scores.update({k: (s, iteration) for k, s in zip(batch.docno, batch.score)})
 
@@ -178,7 +162,7 @@ class QUAM(pt.Transformer):
                     new_docs = recent_docs.intersection(S)  ### Find newly re-ranked documents in S    
                     
                     if new_docs is not None:
-                        self._update_frontier_corpus_graph(new_docs, res_map[1],scores, q_aff_ds, docid_index, top_k_r1, scores_dict)
+                        self._update_frontier_corpus_graph(new_docs, res_map[1],scores, q_aff_ds, docid_index, S, scores_dict)
 
                 iteration+=1   
 
@@ -245,12 +229,11 @@ class QUAM(pt.Transformer):
             S: Set $S$ with scores from scorer for documents in top_res.  
         """
 
-        """ if we want to use Expected Affinity (EAffM), normalize the relevance scores/ node weights."""
-        ## need to re-write for empty scored_batch
-        if self.affm_name=="EAffM":
-            doc_ids, rel_score = zip(*S.items())
-            rel_score = self.softmax(np.array(rel_score))
-            S = dict(zip(doc_ids, rel_score))
+        """ if we want to use Set Affinity, normalize the relevance scores/ node weights."""
+
+        doc_ids, rel_score = zip(*S.items())
+        rel_score = self.softmax(np.array(rel_score))
+        S = dict(zip(doc_ids, rel_score))
 
 
         for doc_id in scored_batch:
@@ -277,40 +260,20 @@ class QUAM(pt.Transformer):
                     stored_dict[doc_id] = {"neighbours": neighbors, "affinity_scores":aff_scores}  
 
 
-            # """We use interpolation between edge weights from G_a, G_c or Retriever.
-            # alpha is the parameter to control the level of interpolation.
-            #                                                             """
-            # if self.use_int:
-            #     batch_ = pd.DataFrame(neighbors, columns=['docno'])
-            #     batch_['qid']=doc_id
-            #     query = self.dataset.get(doc_id).text
-            #     batch_['query']= "".join([x if x.isalnum() else " " for x in query])
-            #     doc_text = []
-            #     for doc in neighbors:
-            #         doc_text.append(self.dataset.get(doc).text)
-            #     batch_['text'] = doc_text    
+            """ If affinity scores are not sorted, sort them and take top k neighbours. """  
 
-            #     ret_scores_batch = self.retriever(batch_)
-            #     ret_aff_scores = ret_scores_batch.score.tolist()
-            #     aff_scores = [self.alpha*aff_s+(1-self.alpha)*ret_aff_s for aff_s, ret_aff_s in zip(aff_scores, ret_aff_scores)]
-
-
-            #""" If want to sort the affinity scores"""  # need to re-write for efficinecy
             combined_docs_affscores = list(zip(neighbors,aff_scores))
             combined_sorted = sorted(combined_docs_affscores, key=lambda x:x[1], reverse=True)
             top_lk_docs_scores = combined_sorted[:self.lk]
             neighbors, aff_scores = zip(*top_lk_docs_scores)
 
 
+            """for each neighbour, calculate or update the set affinity score and update the frontier."""
+
             for neighbor, aff_score in zip(neighbors, aff_scores):
                 s_doc = S[doc_id]
                 if neighbor not in scored_dids:      # Neighboour should not be in scores 
                     frontier[neighbor]+=aff_score*s_doc   #### f(d,d').R(d)
-
-                    # if neighbor in frontier:
-                    #     frontier[neighbor]+= aff_score*S[doc_id]   #### A(d,d').R(d)   
-                    # else:
-                    #     frontier[neighbor] = aff_score*S[doc_id]
 
 
     def get_scores_on_fly(self, doc_id, neighbours):
