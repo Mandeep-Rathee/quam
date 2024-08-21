@@ -11,11 +11,9 @@ import transformers
 
 import pyterrier as pt
 pt.init()
-import pyterrier_alpha as pta
 from pyterrier_t5 import MonoT5ReRanker
 from pyterrier_pisa import PisaIndex
-from pyterrier_adaptive import GAR
-from pyterrier_dr import NumpyIndex, TctColBert, BiScorer
+from gar_aff import GAR
 from pyterrier_quam import QUAM
 from transformers import BertTokenizer, BertForSequenceClassification
 
@@ -59,31 +57,22 @@ base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_
 model = BinaryClassificationBertModel(base_model)
 model.load_state_dict(torch.load(f"laff_models/bert-base-laff.pth"))
 model.to(device)
-dataset_store = ir_datasets.load('mmodels/laff_model.pth')
 
-
+dataset_store = ir_datasets.load('msmarco-passage')
 docstore = dataset_store.docs_store()
-
-
-if args.retriever=="bm25":
-    retriever = PisaIndex.from_dataset('msmarco_passage').bm25()
-else:
-    retriever = (
-        TctColBert('castorini/tct_colbert-v2-hnp-msmarco') >>
-        NumpyIndex('indices/castorini__tct_colbert-v2-hnp-msmarco.np', verbose=False))
-
+retriever = PisaIndex.from_dataset('msmarco_passage').bm25()
 dataset = pt.get_dataset('irds:msmarco-passage')
+
+
 
 scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=args.batch)
 pipeline = retriever >> scorer
 
 
-if args.graph_name=="gtcthnp":
-    graph_128 = CorpusGraph.load("corpusgraph_k128").to_limit_k(128)
-    graph = CorpusGraph.load("corpusgraph_k128").to_limit_k(args.lk)
-else:
-    graph_128 = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(128)
-    graph = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(args.lk)
+
+
+graph_128 = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(128)
+graph = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(args.lk)
 
 
 

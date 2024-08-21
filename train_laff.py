@@ -59,9 +59,7 @@ def add_training_data(row):
 run_ds.map(add_training_data, desc="adding data points to data list")
 
 
-"""In the following code snippet, we define a custom collate function that encodes the batch of data points. 
-The function takes a batch of data points and encodes them using the tokenizer. The function returns a dictionary containing the input IDs, attention mask, token type IDs, S, and score for each data point in the batch. 
-"""
+
 
 base_model_name =  "bert-base-uncased" 
 tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.float16)

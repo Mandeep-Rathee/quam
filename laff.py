@@ -118,7 +118,7 @@ if __name__ == '__main__':
     full_query_ds = Dataset.from_pandas(query_df)
     shuffled_ds = full_query_ds.shuffle(seed=42)
 
-    """n is yhe number of queries to process. There are 533k queries in the dataset. Using all we result into a large train dataset. We choose 50k for randomly."""
+    """n is the number of queries to process. There are 533k queries in the MSMARCO training dataset. Using all will result into a large train dataset. We choose 50k randomly."""
     
     n = 50000  
     query_ds = shuffled_ds.select(range(n))
