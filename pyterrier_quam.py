@@ -30,9 +30,9 @@ class QUAM(pt.Transformer):
         corpus_graph: "CorpusGraph",
         dataset = None ,
         tokenizer = None,
-        edge_mask_learner=None,
+        laff_model=None,
         num_results: int = 1000,
-        top_int_res: int=300,
+        top_k_docs: int=300,
         batch_size: Optional[int] = None,
         backfill: bool = True,
         enabled: bool = True,
@@ -55,9 +55,9 @@ class QUAM(pt.Transformer):
         self.corpus_graph = corpus_graph
         self.dataset = dataset
         self.tokenizer = tokenizer
-        self.edge_mask_learner = edge_mask_learner
+        self.laff_model = laff_model
         self.num_results = num_results
-        self.top_int_res = top_int_res
+        self.top_k_docs = top_k_docs
         if batch_size is None:
             batch_size = scorer.batch_size if hasattr(scorer, 'batch_size') else 16
         self.batch_size = batch_size
@@ -115,10 +115,10 @@ class QUAM(pt.Transformer):
 
                 self._drop_docnos_from_counters(batch.docno, res_map)
 
-                if len(scores) < self.num_results and self.enabled and new_docs is not None: 
+                if len(scores) < self.num_results and self.enabled: 
 
                     r1_upto_now.update({k: s for k, s  in zip(batch.docno, batch.score)})    # Re-ranked doccumnets (R1) so far 
-                    S = dict(Counter(r1_upto_now).most_common(self.top_k_docs))       # Take top_int_res(hyper-parameter) documents from R1
+                    S = dict(Counter(r1_upto_now).most_common(self.top_k_docs))       # Take top s(hyper-parameter) documents from R1
                     recent_docs = set(batch.docno)
                     new_docs = recent_docs.intersection(S)  ### Find newly re-ranked documents in S    
                     
@@ -175,11 +175,10 @@ class QUAM(pt.Transformer):
         We will release the full laff based graph soon, meanwhile we need to calculate them on fly. 
     """
     
-    def _update_frontier_corpus_graph(self, scored_batch, frontier, scored_dids, q_aff_ds, docid_index, S, stored_dict):
+    def _update_frontier_corpus_graph(self, scored_batch, frontier, scored_dids, S):
         """
             Scored_batch: the documents from prevoius Iteration's batch which are in top_res (topk documents from R1)
-            frontier: res_map[1] = {"docid" :xpected_aff_score} Either we add the doc to frontier or update the score. 
-            q_aff_ds: the part of saved aff scores dataset for query q.
+            frontier: res_map[1] = {"docid" :set_aff} Either we add the doc to frontier or update the score. 
             S: Set $S$ with scores from scorer for top k documents from R1.  
         """
 
@@ -193,8 +192,6 @@ class QUAM(pt.Transformer):
         for doc_id in scored_batch:
             if self.use_corpus_graph:     # Use G_c (Corpus Graph) for edge weights (affinity scores)
                 neighbors, aff_scores = self.corpus_graph.to_limit_k(self.lk).neighbours(doc_id, True)
-                if self.graph_name=="gtcthnp":
-                     aff_scores =  [(x - min(aff_scores)) / (max(aff_scores) - min(aff_scores)) for x in aff_scores]
                 neighbors = neighbors.tolist()
 
             else:                           # Use G_a (Affinity Graph) for edge weights (affinity scores)
@@ -225,7 +222,7 @@ class QUAM(pt.Transformer):
             data_list.append((doc_id, nbh, 1.0))
 
         batch_dataset = MSMARCODataset(data_list, self.dataset,  self.tokenizer)
-        loader = DataLoader(batch_dataset, batch_size=1024,shuffle=False)
+        loader = DataLoader(batch_dataset, batch_size=128,shuffle=False)
 
         for batch in loader:
             input_ids = batch['input_ids'].to(device)
@@ -233,7 +230,7 @@ class QUAM(pt.Transformer):
             token_type_ids=batch['token_type_ids'].to(device) 
 
             with torch.no_grad():
-                outputs = self.edge_mask_learner(input_ids=input_ids, attention_mask=attention_mask,token_type_ids=token_type_ids)
+                outputs = self.laff_model(input_ids=input_ids, attention_mask=attention_mask,token_type_ids=token_type_ids)
                 logits = outputs.logits
 
             preds = [tensor_item.item() for tensor_item in logits]  

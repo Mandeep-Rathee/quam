@@ -1,6 +1,8 @@
 # QuAM: Adaptive Retrieval through Query Affinity Modelling
 
-**We are continuously polishing the code.**
+
+
+# We are continuously polishing the code.
 
 <p align="center">
   <img src="quam_main_fig.jpg" />
@@ -9,11 +11,11 @@
 ## Corpus Graph
 
 We would like to thank the author of the GAR paper for providing the corpus graph. 
-We will use the same corpus graph for our experiments. 
+We use the same corpus graph for our experiments. 
 We start with the 128 neighbours corpus graph (G_c) and create an affinity Graph (G_a).
-
+For instance, the bm25 based corpus graph can be downloaded using:
 ```
-graph_128 = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
+graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 ```
 
 

@@ -33,20 +33,16 @@ class GAR(pt.Transformer):
     def __init__(self,
         scorer: pt.Transformer,
         corpus_graph: 'CorpusGraph',
-        graph_name: str = "gbm25",
-        dl_type: int= 19,
-        retriever_name: str="bm25",
         num_results: int = 1000,
         batch_size: Optional[int] = None,
         retriever = None,
         dataset = None ,
         tokenizer = None,
-        edge_mask_learner=None,
+        laff_model=None,
         use_int:bool = False,
         laff_scores:bool = False,
         saved_scores:bool = False,
         lk: int = 16,
-        alpha: float=0.5,
         backfill: bool = True,
         enabled: bool = True,
         verbose: bool = False):
@@ -63,9 +59,6 @@ class GAR(pt.Transformer):
         """
         self.scorer = scorer
         self.corpus_graph = corpus_graph
-        self.graph_name = graph_name
-        self.dl_type = dl_type
-        self.retriever_name = retriever_name
         self.num_results = num_results
         if batch_size is None:
             batch_size = scorer.batch_size if hasattr(scorer, 'batch_size') else 16
@@ -73,12 +66,10 @@ class GAR(pt.Transformer):
         self.retriever = retriever
         self.dataset = dataset
         self.tokenizer = tokenizer
-        self.edge_mask_learner = edge_mask_learner
-        self.use_int = use_int
+        self.laff_model = laff_model
         self.laff_scores = laff_scores
         self.lk = lk
         self.saved_scores = saved_scores
-        self.alpha = alpha
         self.backfill = backfill
         self.enabled = enabled
         self.verbose = verbose
@@ -126,7 +117,7 @@ class GAR(pt.Transformer):
                 scores.update({k: (s, iteration) for k, s in zip(batch.docno, batch.score)})
                 self._drop_docnos_from_counters(batch.docno, res_map)
                 if len(scores) < self.num_results and self.enabled:
-                        self._update_frontier(batch, res_map[1], frontier_data, scores, docid_index)
+                        self._update_frontier(batch, res_map[1], frontier_data, scores)
                 iteration += 1
 
 
@@ -164,13 +155,13 @@ class GAR(pt.Transformer):
             'iteration': result['iteration'],
         })
 
-    def _update_frontier(self, scored_batch, frontier, frontier_data, scored_dids, docid_index):
+    def _update_frontier(self, scored_batch, frontier, frontier_data, scored_dids):
         remaining_budget = self.num_results - len(scored_dids)
         for score, did in sorted(zip(scored_batch.score, scored_batch.docno), reverse=True):
             if len(frontier) < remaining_budget or score >= frontier_data['minscore']:
                 hit = False
                 if self.laff_scores:
-                    target_neighbors = self.laff_based_neighbors(did, docid_index)    
+                    target_neighbors = self.laff_based_neighbors(did)    
                 else:
                     target_neighbors = self.corpus_graph.to_limit_k(self.lk).neighbours(did)
                 for target_did in target_neighbors:
@@ -217,7 +208,7 @@ class GAR(pt.Transformer):
             token_type_ids=batch['token_type_ids'].to(device) 
 
             with torch.no_grad():
-                outputs = self.edge_mask_learner(input_ids=input_ids, attention_mask=attention_mask,token_type_ids=token_type_ids)
+                outputs =  self.laff_model(input_ids=input_ids, attention_mask=attention_mask,token_type_ids=token_type_ids)
                 logits = outputs.logits
 
             preds = [tensor_item.item() for tensor_item in logits]  

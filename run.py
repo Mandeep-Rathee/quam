@@ -23,14 +23,12 @@ from base_models import  BinaryClassificationBertModel
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lk", type=int, default=16, help="the value of k for selecting k neighbourhood graph")
-parser.add_argument("--device", type=str, default="cuda", help="device type/name")
-parser.add_argument("--edge_path", type=str, default="edges.u32.np", help="path where edges are stored")
 parser.add_argument("--graph_name", type=str, default="gbm25", help="name of the graph")
 parser.add_argument("--dl_type", type=int, default=19, help="dl 19 or 20")
 parser.add_argument("--seed", type=int, help="seed",default=1234)
 parser.add_argument("--batch", type=int, default=16, help="batch size")
 parser.add_argument("--budget", type=int, default=100, help="budget c")
-parser.add_argument("--top_res", type=int, default=30, help="top intial docs as a seed to the affinity model")
+parser.add_argument("--s", type=int, default=30, help="top s docs (S) to calculate the set affinity.")
 parser.add_argument("--verbose", action="store_true", help="if show progress bar.")
 parser.add_argument("--retriever", type=str, default="bm25", help="name of the retriever")
 parser.add_argument("--ret_scorer", type=str, default="bm25", help="name of the retriever as a scorer")
@@ -72,49 +70,42 @@ pipeline = retriever >> scorer
 
 """
 We would like to thank the author of the GAR paper for providing the corpus graph. 
-We will use the same corpus graph for our experiments. 
+We use the same corpus graph for our experiments. 
 We start with the 128 neighbours corpus graph (G_c) and create an affinity Graph (G_a).
 """
 
-graph_128 = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
-graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128').to_limit_k(16)
+graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 
 
-
-
-pd.set_option('display.max_columns', None) 
-pd.set_option('display.width', None)  # Display full width of the terminal
 
 from pyterrier.measures import *
 dataset = pt.get_dataset(f'irds:msmarco-passage/trec-dl-20{args.dl_type}/judged')
 pd.set_option('display.max_columns', None) 
 pd.set_option('display.width', None)  # Display full width of the terminal
 
-print(f"retriever={args.retriever} budget c={args.budget} graph={args.graph_name} b={args.batch} lk={args.lk} top={args.top_res}")
+print(f"retriever={args.retriever} budget c={args.budget} graph={args.graph_name} b={args.batch} lk={args.lk} top={args.s}")
 
 
 exp = pt.Experiment(
     [retriever % args.budget >> scorer,
-        retriever >>  GAR(scorer=scorer, corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
-                          num_results=args.budget, laff_scores=False,
+        retriever >>  GAR(scorer=scorer, corpus_graph=graph, num_results=args.budget, laff_scores=False,
                            lk=args.lk, batch_size=args.batch),
 
-        retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,
-                        dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
-                        num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,
+        retriever >>  QUAM(scorer=scorer,corpus_graph=graph,
+                        dataset= docstore, tokenizer= tokenizer, laff_model=model, 
+                        num_results=args.budget,top_k_docs=args.s, batch_size=args.batch,
                         use_corpus_graph=True, lk=args.lk, verbose=args.verbose),
 
 
-        retriever  >> GAR(scorer=scorer, corpus_graph=graph_128,graph_name=args.graph_name , dl_type=args.dl_type,
-                        retriever_name = args.retriever, 
-                         dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model,
-                          batch_size=args.batch, num_results=args.budget, laff_scores=True,saved_scores=True,
+        retriever  >> GAR(scorer=scorer, corpus_graph=graph, 
+                         dataset= docstore, tokenizer= tokenizer, laff_model=model,
+                          batch_size=args.batch, num_results=args.budget, laff_scores=True,
                           lk=args.lk
                           ),
 
-        retriever >>  QUAM(scorer=scorer,corpus_graph=graph_128,
-                        dataset= docstore, tokenizer= tokenizer,edge_mask_learner=model, 
-                        num_results=args.budget,top_int_res=args.top_res, batch_size=args.batch,
+        retriever >>  QUAM(scorer=scorer,corpus_graph=graph,
+                        dataset= docstore, tokenizer= tokenizer, laff_model=model, 
+                        num_results=args.budget,top_k_docs=args.s, batch_size=args.batch,
                         use_corpus_graph=False, lk=args.lk, verbose=args.verbose),
 
         ],
@@ -122,12 +113,13 @@ exp = pt.Experiment(
     dataset.get_qrels(),
     [nDCG@10, nDCG@args.budget, R(rel=2)@args.budget],
     names=[f"{args.retriever}_monot5.c{args.budget}", 
-            f"GAR.c{args.budget}",            
-            f"QuAM.c{args.budget}",
-            f"GAR_Laff.c{args.budget}",
-            f"QuAM_Laff.c{args.budget}"
+            f"GAR.c{args.budget}",    # GAR_bm25          
+            f"QuAM.c{args.budget}",  # GAR_bm25 + SetAff
+            f"GAR_Laff.c{args.budget}", # GAR_bm25 + Laff
+            f"QuAM_Laff.c{args.budget}" # Quam_bm25
             ],
-    save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     
+    save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     # If you do not want to use the saved runs, please comment this line.
 )
 print(exp.T)
 print('*'*100)
+
