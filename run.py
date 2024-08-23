@@ -13,12 +13,13 @@ import pyterrier as pt
 pt.init()
 from pyterrier_t5 import MonoT5ReRanker
 from pyterrier_pisa import PisaIndex
+from pyterrier_adaptive import  CorpusGraph
 from gar_aff import GAR
 from pyterrier_quam import QUAM
 from transformers import BertTokenizer, BertForSequenceClassification
 
 from base_models import  BinaryClassificationBertModel
-from corpus_graph_q import CorpusGraph
+#from corpus_graph_q import CorpusGraph
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lk", type=int, default=16, help="the value of k for selecting k neighbourhood graph")
@@ -55,7 +56,7 @@ base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_
 """Define the model and load the pre-trained weights"""
 
 model = BinaryClassificationBertModel(base_model)
-model.load_state_dict(torch.load(f"laff_models/bert-base-laff.pth"))
+model.load_state_dict(torch.load(f"laff_model/bert-base-laff.pth"))
 model.to(device)
 
 dataset_store = ir_datasets.load('msmarco-passage')
@@ -69,10 +70,15 @@ scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batc
 pipeline = retriever >> scorer
 
 
+"""
+We would like to thank the author of the GAR paper for providing the corpus graph. 
+We will use the same corpus graph for our experiments. 
+We start with the 128 neighbours corpus graph (G_c) and create an affinity Graph (G_a).
+"""
 
+graph_128 = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
+graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128').to_limit_k(16)
 
-graph_128 = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(128)
-graph = CorpusGraph.load(f"msmarco-passage.{args.graph_name}.1024").to_limit_k(args.lk)
 
 
 
