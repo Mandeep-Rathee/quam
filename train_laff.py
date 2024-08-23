@@ -39,7 +39,7 @@ dataset = ir_datasets.load("msmarco-passage/train")
 doc_store = dataset.docs_store()
 
 
-run_ds = datasets.load_from_disk("laff_train_data")
+run_ds = datasets.load_from_disk("data/laff_train_data")
 data_list = []
 
 def add_training_data(row):
@@ -243,4 +243,4 @@ if __name__ == "__main__":
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch+1}, Average Loss: {avg_loss:.4f}")
 
-    torch.save(model.state_dict(), f"laffm/bert-base-laff.pth")    
+    torch.save(model.state_dict(), f"laff-model/bert-base-laff.pth")    

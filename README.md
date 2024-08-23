@@ -16,8 +16,9 @@ We have added all dependencies in requirements.txt file.
 ### :file_folder: File Structure
 
 ```
-├── laff_train_data/
-├── laffm/
+├── data/
+│    ├── laff_train_data/
+├── laff_model/
 ├── saved_pyterrier_runs/
 │    ├── gbm25/
 │    ├── gtcthnp/
@@ -45,25 +46,25 @@ graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 
 
 ## Training Data for Learnt Affinity Model
-The training data can be created using the laff.py file. Alternatively, we release the training dataset for learnt affinity model [here](https://zenodo.org/records/13363455) using Zenodo anonymously. The dataset has following files:
+The training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model [here](https://zenodo.org/records/13363455) using Zenodo anonymously. The dataset has following files:
 
 1. data-00000-of-00001.arrow
 2. dataset_info.json
 3. state.json
 
-Please download all 3 files in the `laff_train_data/` folder. Further, the dataset can be loaded as
+Please download all 3 files in the `data/laff_train_data` folder. Further, the dataset can be loaded as
 
 ```
 import datasets
-ds = datasets.load_from_disk("laff_train_data")
+ds = datasets.load_from_disk("data/laff_train_data")
 ```
 
 ## Learnt Affinity Model
-The Learnt affinity model can be trained using the train_laff.py file. Alternatively, we have released the model's weights anonymously using Zenodo and can be downloaded from [here](https://zenodo.org/records/13363455). The corresponding file is:
+The Learnt affinity model can be trained using the `train_laff.py` file. Alternatively, we have released the model's weights anonymously using Zenodo and can be downloaded from [here](https://zenodo.org/records/13363455). The corresponding file is:
 
 - bert-base-laff.pth
 
-Please download the model at `laffm/` folder. Further the model can be loaded as follows:
+Please download the model at `laff_model/` folder. Further the model can be loaded as follows:
 
 ```
 from transformers import BertTokenizer, BertForSequenceClassification
@@ -82,7 +83,7 @@ model.to(device)
 
 ## Reproduction
 
-Our results can be reproduced by using the run.py file. Additionally, we have also provided the saved runs in the  `saved_pyterrier_runs/` folder.
+Our results can be reproduced by using the `run.py` file. Additionally, we have also provided the saved runs in the  `saved_pyterrier_runs/` folder.
 
 We use the following combinations of budget c and |S|=s:
 
@@ -93,7 +94,7 @@ We use the following combinations of budget c and |S|=s:
 | 1000 | 300|
 
 
-To reproduce the results for bm25 retriever and corpus graph for TREC DL'19, run
+To reproduce the results for bm25 retriever and corpus graph for TREC DL'19 , run
 
 ```
 python3 run.py --budget 50 --s 10 --verbose --dl_type 19
