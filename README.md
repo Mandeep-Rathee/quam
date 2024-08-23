@@ -52,7 +52,7 @@ The training data can be created using the `laff.py` file. Alternatively, we rel
 2. dataset_info.json
 3. state.json
 
-Please download all 3 files in the `data/laff_train_data` folder. Further, the dataset can be loaded as
+Please download all 3 files in the `data/laff_train_data/` folder. Further, the dataset can be loaded as
 
 ```
 import datasets
