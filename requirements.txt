@@ -1,11 +1,5 @@
+pyterrier-t5==0.0.1
+pyterrier-adaptive==0.1.0
+pyterrier-pisa==0.0.6
 numpy==1.26.4
 pandas==1.4.2
-pyterrier-adaptive==0.1.0
-pyterrier-alpha==0.6.2
-pyterrier-dr==0.0.1
-pyterrier-pisa==0.0.6
-pyterrier-t5==0.0.1
-python-terrier==0.10.0
-tokenizers==0.19.1
-torch==2.4.0
-transformers==4.43.4

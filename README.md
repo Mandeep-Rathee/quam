@@ -11,7 +11,15 @@
 ## Setup
 
 ### Requirements
-We have added all dependencies in requirements.txt file.
+We have added all dependencies in requirements.txt file which can be downloaded as follows:
+
+```
+pip install --upgrade git+https://github.com/terrierteam/pyterrier_t5.git
+pip install --upgrade git+https://github.com/terrierteam/pyterrier_adaptive.git
+pip install pyterrier_pisa==0.0.6
+pip install numpy==1.21.0
+pip install pandas==1.4.2
+```
 
 ### :file_folder: File Structure
 
@@ -64,7 +72,7 @@ The Learnt affinity model can be trained using the `train_laff.py` file. Alterna
 
 - bert-base-laff.pth
 
-Please download the model at `laff_model/` folder. Further the model can be loaded as follows:
+Please download the model in `laff_model/` folder. Further the model can be loaded as follows:
 
 ```
 from transformers import BertTokenizer, BertForSequenceClassification
