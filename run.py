@@ -19,7 +19,6 @@ from pyterrier_quam import QUAM
 from transformers import BertTokenizer, BertForSequenceClassification
 
 from base_models import  BinaryClassificationBertModel
-#from corpus_graph_q import CorpusGraph
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--lk", type=int, default=16, help="the value of k for selecting k neighbourhood graph")
