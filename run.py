@@ -54,7 +54,7 @@ base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_
 """Define the model and load the pre-trained weights"""
 
 model = BinaryClassificationBertModel(base_model)
-model.load_state_dict(torch.load(f"laff_model/bert-base-laff.pth"))
+model.load_state_dict(torch.load(f"laffm/bert-base-laff.pth"))
 model.to(device)
 
 dataset_store = ir_datasets.load('msmarco-passage')

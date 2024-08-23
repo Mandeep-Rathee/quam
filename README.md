@@ -8,6 +8,31 @@
   <img src="quam_main_fig.jpg" />
 </p>
 
+## Setup
+
+### Requirements
+We have added all dependencies in requirements.txt file.
+
+### :file_folder: File Structure
+
+```
+├── laff_train_data/
+├── laffm/
+├── saved_pyterrier_runs/
+│    ├── gbm25/
+│    ├── gtcthnp/
+├── base_models.py
+├── dataset_utils.py
+├── gar_aff.py
+├── laff.py
+├── pyterrier_quam.py
+├── quam_main_fig.jpg
+├── requirements.txt
+├── run.py
+├── train_laff.py
+└── README.md
+```
+
 ## Corpus Graph
 
 We would like to thank the author of the GAR paper for providing the corpus graph. 
@@ -26,11 +51,11 @@ The training data can be created using the laff.py file. Alternatively, we relea
 2. dataset_info.json
 3. state.json
 
-Please download all 3 files in the data/laff_train_data folder. Further, the dataset can be loaded as
+Please download all 3 files in the `laff_train_data/` folder. Further, the dataset can be loaded as
 
 ```
 import datasets
-ds = datasets.load_from_disk("data/laff_train_data")
+ds = datasets.load_from_disk("laff_train_data")
 ```
 
 ## Learnt Affinity Model
@@ -38,7 +63,7 @@ The Learnt affinity model can be trained using the train_laff.py file. Alternati
 
 - bert-base-laff.pth
 
-Please download the model at laff_model/ folder. Further the model can be loaded as follows:
+Please download the model at `laffm/` folder. Further the model can be loaded as follows:
 
 ```
 from transformers import BertTokenizer, BertForSequenceClassification
@@ -53,6 +78,25 @@ base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_
 model = BinaryClassificationBertModel(base_model)
 model.load_state_dict(torch.load(f"laff_model/bert-base-laff.pth"))
 model.to(device)
+```
+
+## Reproduction
+
+Our results can be reproduced by using the run.py file. Additionally, we have also provided the saved runs in the  `saved_pyterrier_runs/` folder.
+
+We use the following combinations of budget c and |S|=s:
+
+|budget | s |
+| ------ | --- |
+| 50 | 10 |
+| 100 | 30|
+| 1000 | 300|
+
+
+To reproduce the results for bm25 retriever and corpus graph for TREC DL'19, run
+
+```
+python3 run.py --budget 50 --s 10 --verbose --dl_type 19
 ```
 
 

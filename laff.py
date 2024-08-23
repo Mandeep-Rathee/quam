@@ -133,7 +133,7 @@ if __name__ == '__main__':
     print("Processing complete")
     print(processed_dataset)
     
-    processed_dataset.save_to_disk(f"data/laff_train_data")
+    processed_dataset.save_to_disk(f"laff_train_data")
 
 
 
