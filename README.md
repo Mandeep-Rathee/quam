@@ -42,7 +42,7 @@ pip install pandas==1.4.2
 
 ## Corpus Graph
 
-We would like to thank the author of the GAR paper for providing the corpus graph. 
+We would like to thank the author of the [GAR](https://arxiv.org/pdf/2208.08942) paper for providing the corpus graph. 
 We use the same corpus graph for our experiments. 
 We start with the 128 neighbours corpus graph (G_c) and create an affinity Graph (G_a).
 For instance, the bm25 based corpus graph can be downloaded using:
