@@ -47,6 +47,7 @@ We use the same corpus graph for our experiments.
 We start with the 128 neighbours corpus graph (G_c) and create an affinity Graph (G_a).
 For instance, the bm25 based corpus graph can be downloaded using:
 ```
+from pyterrier_adaptive import  CorpusGraph
 graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 ```
 
