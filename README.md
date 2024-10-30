@@ -54,7 +54,7 @@ graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 
 
 ## Training Data for Learnt Affinity Model
-The training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model [here](https://zenodo.org/records/13363455) using Zenodo anonymously. The dataset has following files:
+The training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model [here](https://zenodo.org/records/13363455) using Zenodo. The dataset has following files:
 
 1. data-00000-of-00001.arrow
 2. dataset_info.json
@@ -68,7 +68,7 @@ ds = datasets.load_from_disk("data/laff_train_data")
 ```
 
 ## Learnt Affinity Model
-The Learnt affinity model can be trained using the `train_laff.py` file. Alternatively, we have released the model's weights anonymously using Zenodo and can be downloaded from [here](https://zenodo.org/records/13363455). The corresponding file is:
+The Learnt affinity model can be trained using the `train_laff.py` file. Alternatively, we have released the model's weights using Zenodo and can be downloaded from [here](https://zenodo.org/records/13363455). The corresponding file is:
 
 - bert-base-laff.pth
 
