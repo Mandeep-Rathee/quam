@@ -1,6 +1,7 @@
 # QuAM: Adaptive Retrieval through Query Affinity Modelling
 
 
+This is Github repository for our paper [Quam: Adaptive Retrieval through Query Affinity Modelling](https://arxiv.org/pdf/2410.20286)  accepted in 18th ACM International Conference on Web Search and Data Mining (WSDM 2025), Hannover, Germany, 10-14 Mar 2025. 
 
 <p align="center">
   <img src="quam_main_fig.jpg" />
@@ -109,4 +110,16 @@ python3 run.py --budget 50 --s 10 --verbose --dl_type 19
 
 
 
+## Citation
+```
+@article{rathee2024quam,
+      title={Quam: Adaptive Retrieval through Query Affinity Modelling}, 
+      author={Mandeep Rathee and Sean MacAvaney and Avishek Anand},
+      year={2024},
+      eprint={2410.20286},
+      archivePrefix={arXiv},
+      primaryClass={cs.IR},
+      url={https://arxiv.org/abs/2410.20286}, 
+}
+```
 
