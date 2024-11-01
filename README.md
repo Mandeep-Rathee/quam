@@ -113,13 +113,10 @@ python3 run.py --budget 50 --s 10 --verbose --dl_type 19
 ## Citation
 ```
 @article{rathee2024quam,
-      title={Quam: Adaptive Retrieval through Query Affinity Modelling}, 
-      author={Mandeep Rathee and Sean MacAvaney and Avishek Anand},
-      year={2024},
-      eprint={2410.20286},
-      archivePrefix={arXiv},
-      primaryClass={cs.IR},
-      url={https://arxiv.org/abs/2410.20286}, 
+  title={Quam: Adaptive Retrieval through Query Affinity Modelling},
+  author={Rathee, Mandeep and MacAvaney, Sean and Anand, Avishek},
+  journal={arXiv preprint arXiv:2410.20286},
+  year={2024}
 }
 ```
 
