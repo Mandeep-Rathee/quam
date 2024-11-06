@@ -54,7 +54,7 @@ graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 
 
 ## Training Data for Learnt Affinity Model
-The training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model [here](https://zenodo.org/records/13363455) using Zenodo. The dataset has following files:
+The training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model from [Huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main/data/laff_train_data). The dataset has following files:
 
 1. data-00000-of-00001.arrow
 2. dataset_info.json
@@ -68,11 +68,20 @@ ds = datasets.load_from_disk("data/laff_train_data")
 ```
 
 ## Learnt Affinity Model
-The Learnt affinity model can be trained using the `train_laff.py` file. Alternatively, we have released the model's weights using Zenodo and can be downloaded from [here](https://zenodo.org/records/13363455). The corresponding file is:
+The Learnt affinity model can be trained using the `train_laff.py` file. Alternatively, we have released the model's weights and can be downloaded from [huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main). The corresponding file is:
 
 - bert-base-laff.pth
 
-Please download the model in `laff_model/` folder. Further the model can be loaded as follows:
+Please download the model in `laff_model/` folder. 
+
+Alternatively, use the following code:
+
+```
+from huggingface_hub import hf_hub_download
+file_path = hf_hub_download(repo_id="mandeep-rathee/laff-model", filename="bert-base-laff.pth")
+```
+
+The model can loaded as follow:
 
 ```
 from transformers import BertTokenizer, BertForSequenceClassification
@@ -85,7 +94,7 @@ tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.flo
 base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=1,torch_dtype=torch.float16)
 
 model = BinaryClassificationBertModel(base_model)
-model.load_state_dict(torch.load(f"laff_model/bert-base-laff.pth"))
+model.load_state_dict(torch.load("laff_model/bert-base-laff.pth"))  ## or file_path
 model.to(device)
 ```
 
