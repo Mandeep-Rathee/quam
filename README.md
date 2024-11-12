@@ -54,7 +54,7 @@ graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
 
 
 ## Training Data for Learnt Affinity Model
-The training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model from [Huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main/data/laff_train_data). The dataset has following files:
+If you want to generate own training dataset and train the affinity model, the training data can be created using the `laff.py` file. Alternatively, we release the training dataset for learnt affinity model from [Huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main/data/laff_train_data). The dataset has following files:
 
 1. data-00000-of-00001.arrow
 2. dataset_info.json
