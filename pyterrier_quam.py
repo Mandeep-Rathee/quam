@@ -1,16 +1,12 @@
 from typing import Optional
 import numpy as np
-import json
-from collections import Counter, defaultdict
+from collections import Counter
 import pyterrier as pt
 import pandas as pd
 import ir_datasets
-import datasets
 logger = ir_datasets.log.easy()
-from dataset_utils import *
 import torch
 import warnings
-import time
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 warnings.filterwarnings("ignore", message="Be aware, overflowing tokens are not returned for the setting you have chosen, i.e. sequence pairs with the 'longest_first' truncation strategy.*")
@@ -28,17 +24,11 @@ class QUAM(pt.Transformer):
     def __init__(self,
         scorer: pt.Transformer,
         corpus_graph: "CorpusGraph",
-        dataset = None ,
-        tokenizer = None,
-        laff_model=None,
         num_results: int = 1000,
         top_k_docs: int=300,
         batch_size: Optional[int] = None,
         backfill: bool = True,
         enabled: bool = True,
-        use_corpus_graph: bool = False,
-        lk: int = 16,
-        affm_name: str = None,
         verbose: bool = True):
         """
             Quam init method
@@ -53,9 +43,6 @@ class QUAM(pt.Transformer):
         """
         self.scorer = scorer
         self.corpus_graph = corpus_graph
-        self.dataset = dataset
-        self.tokenizer = tokenizer
-        self.laff_model = laff_model
         self.num_results = num_results
         self.top_k_docs = top_k_docs
         if batch_size is None:
@@ -63,9 +50,6 @@ class QUAM(pt.Transformer):
         self.batch_size = batch_size
         self.backfill = backfill
         self.enabled = enabled
-        self.use_corpus_graph = use_corpus_graph
-        self.lk = lk
-        self.affm_name = affm_name
         self.verbose = verbose
 
 
@@ -171,8 +155,9 @@ class QUAM(pt.Transformer):
             for c in counters:
                 del c[docno]
 
-    """ this function will update the frontier i.e., res_map[1] based on the edges in the Coprus Graph G_c or Affinity Graph G_a. We use the graph with depth 128.
-        We will release the full laff based graph soon, meanwhile we need to calculate them on fly. 
+    """ 
+    this function will update the frontier i.e., res_map[1] based on the edges in the Coprus Graph G_c or Affinity Graph G_a.
+    
     """
     
     def _update_frontier_corpus_graph(self, scored_batch, frontier, scored_dids, S):
@@ -190,20 +175,8 @@ class QUAM(pt.Transformer):
 
 
         for doc_id in scored_batch:
-            if self.use_corpus_graph:     # Use G_c (Corpus Graph) for edge weights (affinity scores)
-                neighbors, aff_scores = self.corpus_graph.to_limit_k(self.lk).neighbours(doc_id, True)
-                neighbors = neighbors.tolist()
 
-            else:                           # Use G_a (Affinity Graph) for edge weights (affinity scores)
-                neighbors = self.corpus_graph.neighbours(doc_id).tolist()
-                aff_scores = self.get_scores_on_fly(doc_id, neighbors)  ### Should come from either saved or compute the scores. 
-
-                """ If affinity scores are not sorted, sort them and take top k neighbours. """  
-
-                combined_docs_affscores = list(zip(neighbors,aff_scores))
-                combined_sorted = sorted(combined_docs_affscores, key=lambda x:x[1], reverse=True)
-                top_lk_docs_scores = combined_sorted[:self.lk]
-                neighbors, aff_scores = zip(*top_lk_docs_scores)
+            neighbors, aff_scores = self.corpus_graph.neighbours(doc_id, True)
 
             """for each neighbour, calculate or update the set affinity score and update the frontier."""
 
@@ -211,33 +184,5 @@ class QUAM(pt.Transformer):
                 s_doc = S[doc_id]
                 if neighbor not in scored_dids:      # Neighboour should not be in scores 
                     frontier[neighbor]+=aff_score*s_doc   #### f(d,d').R(d)
-
-
-    def get_scores_on_fly(self, doc_id, neighbours):
-
-        scores =[]      
-        data_list = []
-
-        for nbh in neighbours:
-            data_list.append((doc_id, nbh, 1.0))
-
-        batch_dataset = MSMARCODataset(data_list, self.dataset,  self.tokenizer)
-        loader = DataLoader(batch_dataset, batch_size=128,shuffle=False)
-
-        for batch in loader:
-            input_ids = batch['input_ids'].to(device)
-            attention_mask = batch['attention_mask'].to(device)
-            token_type_ids=batch['token_type_ids'].to(device) 
-
-            with torch.no_grad():
-                outputs = self.laff_model(input_ids=input_ids, attention_mask=attention_mask,token_type_ids=token_type_ids)
-                logits = outputs.logits
-
-            preds = [tensor_item.item() for tensor_item in logits]  
-            scores+=preds
-
-        return scores    
-  
-
 
 

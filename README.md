@@ -20,7 +20,7 @@ pip install numpy==1.21.0
 pip install pandas==1.4.2
 ```
 
-### :file_folder: File Structure
+### :file_folder: Files Structure
 
 ```
 ├── data/
@@ -41,15 +41,14 @@ pip install pandas==1.4.2
 └── README.md
 ```
 
-## Corpus Graph
-
-We would like to thank the author of the [GAR](https://arxiv.org/pdf/2208.08942) paper for providing the corpus graph. 
-We use the same corpus graph for our experiments. 
-We start with the 128 neighbours corpus graph (G_c) and create an affinity Graph (G_a).
-For instance, the bm25 based corpus graph can be downloaded using:
+## Corpus and Affinity Graph
+We use the same corpus graph from the [GAR](https://arxiv.org/pdf/2208.08942) paper and we release our laff scores based affinity graph. 
+For instance, the bm25 based corpus and affinity graph can be downloaded using:
 ```
-from pyterrier_adaptive import  CorpusGraph
-graph = CorpusGraph.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
+import pyterrier_alpha as pta
+corpus_graph = pta.Artifact.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128')
+laff_graph = pta.Artifact.from_hf('macavaney/msmarco-passage.corpusgraph.bm25.128.laff')
+
 ```
 
 
@@ -68,11 +67,10 @@ ds = datasets.load_from_disk("data/laff_train_data")
 ```
 
 ## Learnt Affinity Model
-The Learnt affinity model can be trained using the `train_laff.py` file. Alternatively, we have released the model's weights and can be downloaded from [huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main). The corresponding file is:
+If you want to use the learnt affinity model for document-document similarity, you can be train using the `train_laff.py` file. Alternatively, we have released the model's weights and can be downloaded from [huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main). The corresponding file is:
 
 - bert-base-laff.pth
 
-Please download the model in `laff_model/` folder. 
 
 Alternatively, use the following code:
 
@@ -94,7 +92,7 @@ tokenizer = BertTokenizer.from_pretrained(base_model_name, torch_dtype=torch.flo
 base_model = BertForSequenceClassification.from_pretrained(base_model_name, num_labels=1,torch_dtype=torch.float16)
 
 model = BinaryClassificationBertModel(base_model)
-model.load_state_dict(torch.load("laff_model/bert-base-laff.pth"))  ## or file_path
+model.load_state_dict(torch.load(file_path))  ## or saved model path
 model.to(device)
 ```
 
