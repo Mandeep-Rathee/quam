@@ -15,6 +15,9 @@ from pyterrier_t5 import MonoT5ReRanker
 from pyterrier_pisa import PisaIndex
 from pyterrier_adaptive import  CorpusGraph
 import pyterrier_alpha as pta
+from pyterrier_dr import NumpyIndex, TctColBert, BiScorer, FlexIndex, TasB
+
+
 from gar_aff import GAR
 from pyterrier_quam import QUAM
 
@@ -30,7 +33,7 @@ parser.add_argument("--s", type=int, default=30, help="top s docs (S) to calcula
 parser.add_argument("--verbose", action="store_true", help="if show progress bar.")
 parser.add_argument("--retriever", type=str, default="bm25", help="name of the retriever")
 parser.add_argument("--ret_scorer", type=str, default="bm25", help="name of the retriever as a scorer")
-
+parser.add_argument("--scorer_mode", type='str',default='cross', help="if use the scorer as a dual encoder or cross encoder")
 
 
 args = parser.parse_args()
@@ -40,12 +43,19 @@ torch.cuda.manual_seed(args.seed)
 np.random.seed(args.seed)
 transformers.logging.set_verbosity_error()
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 # Load the dataset and the retriever
 retriever = PisaIndex.from_dataset('msmarco_passage').bm25()
 dataset = pt.get_dataset('irds:msmarco-passage')
 
 
-scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=args.batch)
+if args.scorer_mode == 'cross': 
+    scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=args.batch)
+else:
+    scorer = pt.text.get_text(dataset, 'text') >> TasB.dot(batch_size=32, device = device) # or other model
+
 pipeline = retriever >> scorer
 
 
@@ -69,12 +79,12 @@ exp = pt.Experiment(
         retriever >>  GAR(scorer=scorer, corpus_graph = corpus_graph, num_results= args.budget, 
                         batch_size=args.batch),
 
-        retriever >>  QUAM(scorer=scorer,corpus_graph=corpus_graph,
-                        num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
-                       verbose=args.verbose),
+        # retriever >>  QUAM(scorer=scorer,corpus_graph=corpus_graph,
+        #                 num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
+        #                verbose=args.verbose),
 
-        retriever  >> GAR(scorer=scorer, corpus_graph=laff_graph, 
-                          batch_size=args.batch, num_results=args.budget                          ),
+        # retriever  >> GAR(scorer=scorer, corpus_graph=laff_graph, 
+        #                   batch_size=args.batch, num_results=args.budget),
 
         retriever >>  QUAM(scorer=scorer,corpus_graph=laff_graph,
                         num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
@@ -84,10 +94,10 @@ exp = pt.Experiment(
     dataset.get_topics(),
     dataset.get_qrels(),
     [nDCG@10, nDCG@args.budget, R(rel=2)@args.budget],
-    names=[f"{args.retriever}_monot5.c{args.budget}", 
+    names=[f"{args.retriever}TasB.c{args.budget}", 
             f"GAR.c{args.budget}",    # GAR_bm25          
-            f"QuAM.c{args.budget}",  # GAR_bm25 + SetAff
-            f"GAR_Laff.c{args.budget}", # GAR_bm25 + Laff
+            #f"QuAM.c{args.budget}",  # GAR_bm25 + SetAff
+            #f"GAR_Laff.c{args.budget}", # GAR_bm25 + Laff
             f"QuAM_Laff.c{args.budget}" # Quam_bm25
             ],
     #save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     # If you do not want to use the saved runs, please comment this line.
