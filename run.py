@@ -15,7 +15,7 @@ from pyterrier_t5 import MonoT5ReRanker
 from pyterrier_pisa import PisaIndex
 from pyterrier_adaptive import  CorpusGraph
 import pyterrier_alpha as pta
-from pyterrier_dr import NumpyIndex, TctColBert, BiScorer, FlexIndex, TasB
+from pyterrier_dr import TasB
 
 
 from gar_aff import GAR
@@ -79,12 +79,12 @@ exp = pt.Experiment(
         retriever >>  GAR(scorer=scorer, corpus_graph = corpus_graph, num_results= args.budget, 
                         batch_size=args.batch),
 
-        # retriever >>  QUAM(scorer=scorer,corpus_graph=corpus_graph,
-        #                 num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
-        #                verbose=args.verbose),
+        retriever >>  QUAM(scorer=scorer,corpus_graph=corpus_graph,
+                        num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
+                       verbose=args.verbose),
 
-        # retriever  >> GAR(scorer=scorer, corpus_graph=laff_graph, 
-        #                   batch_size=args.batch, num_results=args.budget),
+        retriever  >> GAR(scorer=scorer, corpus_graph=laff_graph, 
+                          batch_size=args.batch, num_results=args.budget),
 
         retriever >>  QUAM(scorer=scorer,corpus_graph=laff_graph,
                         num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
@@ -94,10 +94,10 @@ exp = pt.Experiment(
     dataset.get_topics(),
     dataset.get_qrels(),
     [nDCG@10, nDCG@args.budget, R(rel=2)@args.budget],
-    names=[f"{args.retriever}TasB.c{args.budget}", 
+    names=[f"{args.retriever}monot5.c{args.budget}",  # BM25 + MonoT5 or TAS-B
             f"GAR.c{args.budget}",    # GAR_bm25          
-            #f"QuAM.c{args.budget}",  # GAR_bm25 + SetAff
-            #f"GAR_Laff.c{args.budget}", # GAR_bm25 + Laff
+            f"QuAM.c{args.budget}",  # GAR_bm25 + SetAff
+            f"GAR_Laff.c{args.budget}", # GAR_bm25 + Laff
             f"QuAM_Laff.c{args.budget}" # Quam_bm25
             ],
     #save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     # If you do not want to use the saved runs, please comment this line.
