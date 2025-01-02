@@ -67,7 +67,7 @@ ds = datasets.load_from_disk("data/laff_train_data")
 ```
 
 ## Learnt Affinity Model
-If you want to use the learnt affinity model for document-document similarity, you can be train using the `train_laff.py` file. Alternatively, we have released the model's weights and can be downloaded from [huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main). The corresponding file is:
+If you want to use the learnt affinity model for document-document similarity, you can train using the `train_laff.py` file. Alternatively, we have released the model's weights and can be downloaded from [huggingface](https://huggingface.co/mandeep-rathee/laff-model/tree/main). The corresponding file is:
 
 - bert-base-laff.pth
 

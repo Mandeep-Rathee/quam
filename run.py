@@ -33,7 +33,7 @@ parser.add_argument("--s", type=int, default=30, help="top s docs (S) to calcula
 parser.add_argument("--verbose", action="store_true", help="if show progress bar.")
 parser.add_argument("--retriever", type=str, default="bm25", help="name of the retriever")
 parser.add_argument("--ret_scorer", type=str, default="bm25", help="name of the retriever as a scorer")
-parser.add_argument("--scorer_mode", type='str',default='cross', help="if use the scorer as a dual encoder or cross encoder")
+parser.add_argument("--scorer_mode", type=str,default='cross', help="if use the scorer as a dual encoder or cross encoder")
 
 
 args = parser.parse_args()
@@ -52,12 +52,11 @@ dataset = pt.get_dataset('irds:msmarco-passage')
 
 
 if args.scorer_mode == 'cross': 
-    scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=args.batch)
+    scorer = pt.text.get_text(dataset, 'text') >> MonoT5ReRanker(verbose=False, batch_size=args.batch, device = device)
 else:
-    scorer = pt.text.get_text(dataset, 'text') >> TasB.dot(batch_size=32, device = device) # or other model
+    scorer = pt.text.get_text(dataset, 'text') >> TasB.dot(batch_size=16, device = device) # or other model
 
 pipeline = retriever >> scorer
-
 
 # Load the graphs from the hub
 
@@ -88,20 +87,21 @@ exp = pt.Experiment(
 
         retriever >>  QUAM(scorer=scorer,corpus_graph=laff_graph,
                         num_results=args.budget, top_k_docs=args.s, batch_size=args.batch,
-                         verbose=args.verbose),
+                        verbose=args.verbose),
 
         ],
     dataset.get_topics(),
     dataset.get_qrels(),
     [nDCG@10, nDCG@args.budget, R(rel=2)@args.budget],
-    names=[f"{args.retriever}monot5.c{args.budget}",  # BM25 + MonoT5 or TAS-B
+    names=[f"{args.retriever}monot5.c{args.budget}",  # BM25 >> MonoT5 or TAS-B
             f"GAR.c{args.budget}",    # GAR_bm25          
             f"QuAM.c{args.budget}",  # GAR_bm25 + SetAff
             f"GAR_Laff.c{args.budget}", # GAR_bm25 + Laff
             f"QuAM_Laff.c{args.budget}" # Quam_bm25
             ],
-    #save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/"     # If you do not want to use the saved runs, please comment this line.
+    save_dir = f"saved_pyterrier_runs/{args.graph_name}/dl{args.dl_type}/{args.retriever}/",     # If you do not want to use the saved runs, please comment this line.
+    save_mode='reuse'
+
 )
 print(exp.T)
-print('*'*100)
 
