@@ -16,8 +16,6 @@ We have added all dependencies in requirements.txt file which can be downloaded 
 pip install --upgrade git+https://github.com/terrierteam/pyterrier_t5.git
 pip install --upgrade git+https://github.com/terrierteam/pyterrier_adaptive.git
 pip install pyterrier_pisa==0.0.6
-pip install numpy==1.21.0
-pip install pandas==1.4.2
 ```
 
 ### :file_folder: Files Structure
