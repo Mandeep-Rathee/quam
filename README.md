@@ -1,7 +1,7 @@
 # QuAM: Adaptive Retrieval through Query Affinity Modelling
 
 
-This is Github repository for our paper [Quam: Adaptive Retrieval through Query Affinity Modelling](https://arxiv.org/pdf/2410.20286)  accepted in 18th ACM International Conference on Web Search and Data Mining (WSDM 2025), Hannover, Germany, 10-14 Mar 2025. 
+This is Github repository for our paper [Quam: Adaptive Retrieval through Query Affinity Modelling](https://dl.acm.org/doi/abs/10.1145/3701551.3703584)  published in 18th ACM International Conference on Web Search and Data Mining (WSDM 2025), Hannover, Germany, 10-14 Mar 2025. 
 
 <p align="center">
   <img src="quam_main_fig.jpg" />
